@@ -5,17 +5,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.Date;
-
-@AllArgsConstructor
-@NoArgsConstructor
 @Getter
 @Setter
-public class TicketDto {
+@NoArgsConstructor
+@AllArgsConstructor
+public class TicketSearchRequest {
     private int id;
     private int clientId;
     private int ticketCode;
     private String title;
-    private Date lastModifiedDate;
     private String status;
 }

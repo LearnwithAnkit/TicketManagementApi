@@ -1,25 +1,25 @@
 package com.ticketapi.TicketManagementApp.TicketService;
 
+import com.ticketapi.TicketManagementApp.TicketRepository.TicketRepository;
+import com.ticketapi.TicketManagementApp.entity.Ticket;
 import com.ticketapi.TicketManagementApp.exceptions.ResourceNotFoundException;
 import com.ticketapi.TicketManagementApp.payloads.TicketDto;
 import com.ticketapi.TicketManagementApp.payloads.TicketResponse;
+import com.ticketapi.TicketManagementApp.payloads.TicketSearchRequest;
 import com.ticketapi.TicketManagementApp.util.ResponseHandler;
-import com.ticketapi.TicketManagementApp.TicketRepository.TicketRepository;
-import com.ticketapi.TicketManagementApp.entity.Ticket;
 import org.modelmapper.ModelMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Page;
-
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import java.sql.ResultSet;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -45,91 +45,95 @@ public class TicketService {
             return ResponseHandler.generateResponse("Successfully fetched the tickets", HttpStatus.OK, ticketDtos);
         } catch (Exception e) {
             logger.debug("Inside Service getAllTickets method catch block");
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.OK, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.OK);
         }
     }
 
 
-    public ResponseEntity<?> getTicketById(Integer id) {
+    public ResponseEntity<?> getTicketById(int id) {
         try {
             logger.debug("Inside Service getTicketById method try block");
             Ticket ticket = ticketRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", "UserID", id));
             return ResponseHandler.generateResponse("Successfully fetched the Ticket", HttpStatus.OK, TicketToTicketDto(ticket));
         } catch (ResourceNotFoundException e) {
             String message = e.getMessage();
-            return ResponseHandler.generateResponse(message, HttpStatus.NOT_FOUND, "null");
+            return ResponseHandler.generateResponse(message, HttpStatus.NOT_FOUND);
         } catch (Exception ex) {
             logger.debug("Inside Service getTicketById method catch block");
-            return ResponseHandler.generateResponse("Failed to fetch the ticket", HttpStatus.INTERNAL_SERVER_ERROR, null);
+            return ResponseHandler.generateResponse("Failed to fetch the ticket", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    public ResponseEntity<Object> createTicket(Ticket ticket) {
+    public ResponseEntity<Object> createTicket(TicketDto ticketdto) {
         try {
             logger.debug("Inside Service createTicket method try block");
+            Ticket ticket=TicketDtoToTicket(ticketdto);
             ticket.setLastModifiedDate(new Date());
             TicketDto ticketDto = TicketToTicketDto(ticketRepository.save(ticket));
             return ResponseHandler.generateResponse("Successfully Added Ticket", HttpStatus.CREATED, ticketDto);
         } catch (Exception e) {
             logger.debug("Inside Service createTicket method catch block");
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR, null);
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
-    public ResponseEntity<Object> updateTicket(Integer id, Ticket updatedTicket) {
+    public ResponseEntity<Object> updateTicket(int id, TicketDto updatedTicketdto) {
 
         try {
             logger.debug("Inside Service updateTicket method try block");
+            Ticket updatedTicket=TicketDtoToTicket(updatedTicketdto);
             updatedTicket.setLastModifiedDate(new Date());
             Ticket existingTicket = ticketRepository.findById(id).orElse(null);
             if (existingTicket == null)
                 return ResponseHandler.generateResponse("Successfully Updated the Ticket", HttpStatus.OK, TicketToTicketDto(ticketRepository.save(updatedTicket)));
             else {
-                existingTicket.setTicketCode(updatedTicket.getTicketCode());
-                existingTicket.setStatus(updatedTicket.getStatus());
-                existingTicket.setTitle(updatedTicket.getTitle());
-                existingTicket.setClientId(updatedTicket.getClientId());
-                existingTicket.setLastModifiedDate(updatedTicket.getLastModifiedDate());
+                existingTicket.setTicketCode(updatedTicketdto.getTicketCode());
+                existingTicket.setStatus(updatedTicketdto.getStatus());
+                existingTicket.setTitle(updatedTicketdto.getTitle());
+                existingTicket.setClientId(updatedTicketdto.getClientId());
+                existingTicket.setLastModifiedDate(new Date());
                 return ResponseHandler.generateResponse("Successfully Updated the Ticket", HttpStatus.OK, TicketToTicketDto(ticketRepository.save(existingTicket)));
             }
         } catch (Exception e) {
             logger.debug("Inside Service updateTicket method catch block");
-            return ResponseHandler.generateResponse("Failed to Update the Ticket", HttpStatus.INTERNAL_SERVER_ERROR, null);
+            return ResponseHandler.generateResponse("Failed to Update the Ticket", HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
     }
 
-    public ResponseEntity<?> deleteTicket(Integer id) {
+    public ResponseEntity<?> deleteTicket(int id) {
         try {
             Ticket ticket = ticketRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User", "UserID", id));
             ticketRepository.delete(ticket);
             return ResponseHandler.generateResponse("Ticket Deleted Successfully", HttpStatus.OK, TicketToTicketDto(ticket));
         } catch (ResourceNotFoundException e) {
             String message = e.getMessage();
-            return ResponseHandler.generateResponse(message, HttpStatus.NOT_FOUND, "null");
+            return ResponseHandler.generateResponse(message, HttpStatus.NOT_FOUND);
         } catch (Exception e) {
-            return ResponseHandler.generateResponse("Failed to Delete the Ticket", HttpStatus.INTERNAL_SERVER_ERROR, null);
+            return ResponseHandler.generateResponse("Failed to Delete the Ticket", HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
 
     public ResponseEntity<?> getPaginatedTickets(int page, int size, String sortby, String order) {
         try {
+            logger.debug("Inside Service getPaginatedTickets method try block");
             Sort sort = "asc".equalsIgnoreCase(order) ? Sort.by(sortby).ascending() : Sort.by(sortby).descending();
             Pageable pageable = PageRequest.of(page, size, sort);
             Page<Ticket> pagetickets = ticketRepository.findAll(pageable);
             TicketResponse ticketResponse = this.getTicketResponse(pagetickets);
             return ResponseHandler.generateResponse("Successfully fetched the ticket", HttpStatus.OK, ticketResponse);
         } catch (Exception e) {
-            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND, null);
+            logger.debug("Inside Service getPaginatedTickets method try block");
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND);
         }
     }
 
-    private Ticket TicketDtoToTicket(TicketDto ticketdto) {
+    public Ticket TicketDtoToTicket(TicketDto ticketdto) {
         return modelMapper.map(ticketdto, Ticket.class);
     }
 
-    private TicketDto TicketToTicketDto(Ticket ticket) {
+    public TicketDto TicketToTicketDto(Ticket ticket) {
         return modelMapper.map(ticket, TicketDto.class);
     }
 
@@ -147,4 +151,59 @@ public class TicketService {
     }
 
 
+    public ResponseEntity<?> getTicket(TicketSearchRequest ticketSearchRequest) {
+        try {
+            StringBuilder jpqlBuilder = new StringBuilder();
+            boolean flag = false;
+            if (ticketSearchRequest.getId() != 0) {
+                flag = true;
+                jpqlBuilder.append(" AND t.id = ").append(ticketSearchRequest.getId());
+            }
+
+            if (ticketSearchRequest.getClientId() != 0) {
+                flag = true;
+                jpqlBuilder.append(" AND t.client_id = ").append(ticketSearchRequest.getClientId());
+            }
+
+            if (ticketSearchRequest.getTicketCode() != 0) {
+                flag = true;
+                jpqlBuilder.append(" AND t.ticket_code = ").append(ticketSearchRequest.getTicketCode());
+            }
+
+            if (ticketSearchRequest.getTitle() != null && !ticketSearchRequest.getTitle().isEmpty()) {
+                flag = true;
+                jpqlBuilder.append(" AND t.title = '").append(ticketSearchRequest.getTitle()).append("'");
+            }
+
+            if (ticketSearchRequest.getStatus() != null && !ticketSearchRequest.getStatus().isEmpty()) {
+                flag = true;
+                jpqlBuilder.append(" AND t.status = '").append(ticketSearchRequest.getStatus()).append("'");
+            }
+            if (!flag) return ResponseHandler.generateResponse("Enter valid request details", HttpStatus.BAD_REQUEST);
+            String jpql = jpqlBuilder.toString();
+            System.out.println(jpql);
+            List<Ticket> tickets = ticketRepository.searchTickets(jpql);
+            if (tickets == null || tickets.isEmpty())
+                return ResponseHandler.generateResponse("Ticket Not found", HttpStatus.NOT_FOUND);
+            else
+                return ResponseHandler.generateResponse("Ticket fetched successfully", HttpStatus.OK, tickets);
+        }
+        catch (Exception e)
+        {
+            return ResponseHandler.generateResponse(e.getMessage(), HttpStatus.NOT_FOUND);
+        }
+    }
+
+    public ResponseEntity<?> getTicketByStatus(String status) {
+        try{
+            List<Ticket> tickets=ticketRepository.getTicketByStatus(status);
+            if(tickets.isEmpty()) return ResponseHandler.generateResponse("No ticket Found",HttpStatus.OK);
+            List<TicketDto> ticketDtos=tickets.stream().map(this::TicketToTicketDto).collect(Collectors.toList());
+            return ResponseHandler.generateResponse("Successfully fetched the tickets",HttpStatus.OK,ticketDtos);
+        }
+        catch (Exception e)
+        {
+            return ResponseHandler.generateResponse("Failed to fetch the tickets",HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 }
